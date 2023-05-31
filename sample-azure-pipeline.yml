@@ -1,0 +1,147 @@
+trigger:
+- main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+stages:
+  - stage: stage1
+    jobs:
+      - job: job1
+        variables:
+          SourceFile: ''
+          DestinationFile: ''
+          DeleteFilePath: ''
+          FolderPath: ''
+          NewFolderName: ''
+          SourceUrl: ''
+          OutputFile: ''
+          WaitTime:
+          FileName: 
+          SearchString:
+          XmlScriptFilePath: ''
+
+        steps:
+        - task: CopyFile@2
+          displayName: 'copy file to destination'
+          inputs:
+            Contents:  |
+              $(variables.SourceFile)
+            TargetFolder:  $(variables.DestinationFile)
+        - task: DeleteFiles@1
+          displayName: 'Remove unwanted files'
+          inputs:
+            contents: |
+              $(variables.DeleteFilePath)
+        - task: PowerShell@2
+          displayName: 'Query Folder Files'
+          inputs:
+            targetType: 'inline'
+            script: |
+              $files = Get-ChildItem -Path $(variables.FolderPath) -File -Recurse | Select-Object -ExpandProperty FullName
+              
+              foreach ($file in $files) {
+                Write-Host $file
+              }
+        - task: PowerShell@2
+          displayName: 'Create Folder'
+          inputs:
+            targetType: 'inline'
+            script: |
+              $folderPath = "$(variables.FolderPath)"
+              $newFolderName = "$(variables.NewFolderName)"
+              $newFolderPath = Join-Path -Path $folderPath -ChildPath $newFolderName
+              
+              New-Item -ItemType Directory -Path $newFolderPath
+        - task: DownloadPipelineArtifact@2
+          displayName: 'Download File'
+          inputs:
+            artifact: '$(variables.SourceUrl)'  
+            path: '$(System.ArtifactsDirectory)'  # The directory where the file will be downloaded
+            targetPath: '$(OutputFile)'  # The path and name of the output file
+        - task: PowerShell@2
+          displayName: 'Wait'
+          inputs:
+            targetType: 'inline'
+            script: |
+              Write-Host 'Waiting...'
+              Start-Sleep -Seconds $(variables.WaitTime)
+        - task: PowerShell@2
+          displayName: 'Count Rows'
+          inputs:
+            targetType: 'inline'
+            script: |
+              $fileName = '$(variables.FileName)'
+              $searchString = '$(variables.SearchString)'
+              
+              $fileContent = Get-Content -Path $fileName
+              $matchingRows = $fileContent | Where-Object { $_ -like "*$searchString*" }
+              
+              $rowCount = $matchingRows.Count
+              Write-Host "Number of Rows: $rowCount"
+  - stage: stage2
+    jobs:
+      - job: job1
+        steps:
+        - task: PowerShell@2
+          displayName: 'Wait for Specific Hour on specific day of week'
+          inputs:
+            targetType: 'inline'
+            script: |
+              $desiredDayOfWeek = "Monday"  # Replace with the desired day of the week
+              $desiredHour = 8  # Replace with the desired hour (24-hour format)
+              
+              do {
+                  $currentDayOfWeek = Get-Date -Format "dddd"
+                  $currentHour = Get-Date -Format "HH"
+                  
+                  if ($currentDayOfWeek -ne $desiredDayOfWeek -or $currentHour -lt $desiredHour) {
+                      Write-Host "Waiting..."
+                      Start-Sleep -Seconds 300  # Sleep for 5 minutes before checking again
+                  }
+              } while ($currentDayOfWeek -ne $desiredDay -or $currentHour -lt $desiredHour)
+  - stage: stage3
+    jobs:
+      - job: ReadScriptFileAsXml
+        steps:
+        - task: PowerShell@2
+          displayName: 'Read script file as XML'
+          inputs:
+            targetType: 'inline'
+            script: |
+              $xml = [xml](Get-Content -Path '$(variables.XmlScriptFilePath)')
+              
+              # Access and process XML data
+              $rootNode = $xml.DocumentElement
+              # Perform operations on XML data
+              
+              # Example: Read attribute values from XML elements
+              $attributeValue = $rootNode.SelectSingleNode('//ElementName').Attributes['AttributeName'].Value
+              Write-Host "Attribute Value: $attributeValue"
+  - stage: stage4
+    jobs:
+    - job: ExecuteCustomerOrder
+      displayName: 'Execute Customer Order'
+      steps:
+      - script: |
+          # Execute customer order here
+          # Replace this with the actual commands or scripts to execute the order
+          echo "Executing customer order..."
+        displayName: 'Execute Order'
+      - task: ManualValidation@0
+        displayName: 'Manual Approval'
+        inputs:
+          notifyUsers: |
+            vipin_13_1985@yahoo.com
+          instructions: 'Please review and approve the customer order.'
+
+
+
+
+
+
+
+
+
+
+
